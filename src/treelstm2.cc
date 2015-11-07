@@ -36,7 +36,7 @@ void TreeLSTMBuilder2::start_new_sequence_impl(const vector<Expression>& hinit) 
 }
 
 Expression TreeLSTMBuilder2::add_input(int id, vector<int> children, const Expression& x) {
-  assert (h.size() == id);
+  assert (id >= 0 && h.size() == (unsigned)id);
 
   RNNPointer prev = (RNNPointer)(-1);
   Expression embedding = node_builder.add_input(prev, x);

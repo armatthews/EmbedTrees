@@ -5,7 +5,7 @@
 
 SyntaxTree::SyntaxTree() : dict(nullptr), label_(-1), id_(-1) {}
 
-SyntaxTree::SyntaxTree(string tree, Dict* dict) : dict(dict), id_(-1) {
+SyntaxTree::SyntaxTree(string tree, Dict* dict, const SyntaxTree* parent) : dict(dict), id_(-1), parent(parent) {
   // Sometimes Berkeley parser fails to parse a sentence and just outputs ()
   if (tree == "()") {
     return;
@@ -57,7 +57,7 @@ SyntaxTree::SyntaxTree(string tree, Dict* dict) : dict(dict), id_(-1) {
     }
 
     for (string child_string : child_strings) {
-      children.push_back(SyntaxTree(child_string, dict));
+      children.push_back(SyntaxTree(child_string, dict, this));
     }
     assert (children.size() > 0);
   }

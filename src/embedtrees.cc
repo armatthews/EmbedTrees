@@ -12,8 +12,8 @@ void TreeEmbedder::InitializeParameters(Model& model, unsigned vocab_size) {
   const unsigned half_node_embedding_dim = node_embedding_dim / 2;
   forward_builder = LSTMBuilder(lstm_layer_count, word_embedding_dim, half_node_embedding_dim, &model);
   reverse_builder = LSTMBuilder(lstm_layer_count, word_embedding_dim, half_node_embedding_dim, &model); 
-  tree_builder = new SocherTreeLSTMBuilder(5, lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
-  //tree_builder = new TreeLSTMBuilder2(lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
+  //tree_builder = new SocherTreeLSTMBuilder(5, lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
+  tree_builder = new TreeLSTMBuilder2(lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
   output_builder = SimpleRNNBuilder(lstm_layer_count, node_embedding_dim, final_hidden_dim, &model);
   final_w = model.add_parameters({vocab_size, final_hidden_dim});
   final_b = model.add_parameters({vocab_size});
@@ -150,6 +150,7 @@ vector<Expression> TreeEmbedder::BuildTreeAnnotationVectors(const SyntaxTree& so
       else {
         input_expr = input(cg, {(long)zero_annotation.size()}, &zero_annotation);
       }
+
       Expression node_annotation = tree_builder->add_input((int)node->id(), children, input_expr);
       tree_annotations.push_back(node_annotation);
       index_stack.pop_back();

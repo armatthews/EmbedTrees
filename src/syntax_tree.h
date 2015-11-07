@@ -12,7 +12,7 @@ typedef int WordId;
 class SyntaxTree {
 public:
   SyntaxTree();
-  SyntaxTree(string tree, Dict* dict);
+  SyntaxTree(string tree, Dict* dict, const SyntaxTree* parent = NULL);
 
   bool IsTerminal() const;
   unsigned NumChildren() const;
@@ -26,6 +26,7 @@ public:
 
   SyntaxTree& GetChild(unsigned i);
   const SyntaxTree& GetChild(unsigned i) const;
+  const SyntaxTree* const GetParent() const;
 
   string ToString() const;
   unsigned AssignNodeIds(unsigned start = 0);
@@ -33,6 +34,7 @@ private:
   Dict* dict;
   WordId label_;
   unsigned id_;
+  const SyntaxTree* parent;
   vector<SyntaxTree> children;
 };
 
