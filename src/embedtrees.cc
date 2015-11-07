@@ -23,6 +23,7 @@ void TreeEmbedder::InitializeParameters(Model& model, unsigned vocab_size) {
 }
 
 tuple<unsigned, Expression> TreeEmbedder::BuildGraph(const SyntaxTree& tree, ComputationGraph& cg) {
+  const bool all_nodes = false; // False = roots only
   const unsigned kBOS = 1;
   output_builder.new_graph(cg);
   output_builder.start_new_sequence();
@@ -33,16 +34,21 @@ tuple<unsigned, Expression> TreeEmbedder::BuildGraph(const SyntaxTree& tree, Com
   vector<const SyntaxTree*> nodes = LinearizeNodes(tree);
   assert (nodes.back() == &tree);
   assert (tree_annotations.size() == nodes.size());
-  return CalculateLoss(*nodes.back(), tree_annotations.back(), cg);
 
-  vector<unsigned> word_counts(nodes.size());
-  vector<Expression> losses(nodes.size());
-  unsigned total_word_count = 0;
-  for (unsigned i = 0; i < nodes.size(); ++i) {
-    tie(word_counts[i], losses[i]) = CalculateLoss(*nodes[i], tree_annotations[i], cg);
-    total_word_count += word_counts[i];
+  if (all_nodes) {
+    vector<unsigned> word_counts(nodes.size());
+    vector<Expression> losses(nodes.size());
+    unsigned total_word_count = 0;
+    for (unsigned i = 0; i < nodes.size(); ++i) {
+      tie(word_counts[i], losses[i]) = CalculateLoss(*nodes[i], tree_annotations[i], cg);
+      total_word_count += word_counts[i];
+    }
+    return make_tuple(total_word_count, sum(losses));
   }
-  return make_tuple(total_word_count, sum(losses));
+  else {
+    return CalculateLoss(*nodes.back(), tree_annotations.back(), cg);
+  }
+
 }
 
 tuple<unsigned, Expression> TreeEmbedder::CalculateLoss(const SyntaxTree& tree, Expression embedding, ComputationGraph& cg) {
@@ -57,7 +63,6 @@ tuple<unsigned, Expression> TreeEmbedder::CalculateLoss(const SyntaxTree& tree, 
   RNNPointer prev_state = (RNNPointer)(-1);
   for (unsigned i = 0; i < terminals.size(); ++i) {
     Expression final_hidden_layer = output_builder.add_input(prev_state, embedding);
-    final_hidden_layer = dropout(final_hidden_layer, 0.5);
     Expression dist = affine_transform({finalb, finalw, final_hidden_layer});
     word_losses[i] = pickneglogsoftmax(dist, terminals[i]);
     prev_state = output_builder.state();
