@@ -5,8 +5,8 @@ CNN_BUILD_DIR=$(CNN_DIR)/build
 INCS=-I$(CNN_DIR) -I$(CNN_BUILD_DIR) -I$(EIGEN)
 LIBS=-L$(CNN_BUILD_DIR)/cnn/
 FINAL=-lcnn -lboost_regex -lboost_serialization -lboost_program_options
-#CFLAGS=-std=c++11 -Ofast -g -march=native -pipe
-CFLAGS=-std=c++11 -Wall -pedantic -O0 -g -pipe
+CFLAGS=-std=c++11 -Ofast -g -march=native -pipe
+#CFLAGS=-std=c++11 -Wall -pedantic -O0 -g -pipe
 BINDIR=bin
 OBJDIR=obj
 SRCDIR=src
