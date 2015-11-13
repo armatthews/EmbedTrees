@@ -5,7 +5,7 @@
 
 SyntaxTree::SyntaxTree() : dict(nullptr), label_(-1), id_(-1) {}
 
-SyntaxTree::SyntaxTree(string tree, Dict* dict, const SyntaxTree* parent) : dict(dict), id_(-1), parent(parent) {
+SyntaxTree::SyntaxTree(string tree, Dict* dict, SyntaxTree* parent) : dict(dict), id_(-1), parent(parent) {
   // Sometimes Berkeley parser fails to parse a sentence and just outputs ()
   if (tree == "()") {
     return;
@@ -176,7 +176,75 @@ unsigned SyntaxTree::AssignNodeIds(unsigned start) {
   return start + 1;
 }
 
+SyntaxTreeIterator SyntaxTree::begin() {
+  SyntaxTree* first = (SyntaxTree*)this;
+  while (first->children.size() > 0) {
+    first = &first->children[0];
+  }
+  return SyntaxTreeIterator(this, first);
+}
+
+const SyntaxTreeIterator SyntaxTree::begin() const {
+  SyntaxTree* first = (SyntaxTree*)this;
+  while (first->children.size() > 0) {
+    first = &first->children[0];
+  }
+  return SyntaxTreeIterator(this, first);
+}
+
+SyntaxTreeIterator SyntaxTree::end() {
+  return SyntaxTreeIterator(this, nullptr);
+}
+
+const SyntaxTreeIterator SyntaxTree::end() const {
+  return SyntaxTreeIterator(this, nullptr);
+}
+
 ostream& operator<< (ostream& stream, const SyntaxTree& tree) {
   return stream << tree.ToString();
 }
 
+SyntaxTreeIterator::SyntaxTreeIterator(const SyntaxTree* root, SyntaxTree* current) : root(root), current(current) {}
+
+bool SyntaxTreeIterator::operator==(const SyntaxTreeIterator& rhs) const {
+  return root == rhs.root && current == rhs.current;
+}
+
+bool SyntaxTreeIterator::operator!=(const SyntaxTreeIterator& rhs) const {
+  return !(*this == rhs);
+}
+
+SyntaxTree& SyntaxTreeIterator::operator*() const {
+  return *current;
+}
+
+SyntaxTreeIterator& SyntaxTreeIterator::operator++() {
+  if (current != NULL) {
+    if (current->next_sibling != NULL) {
+      current = current->next_sibling;
+    }
+    else if (current != root) {
+      current = current->parent;
+    }
+    else {
+      current = nullptr;
+    }
+  }
+  return *this;
+}
+
+SyntaxTreeIterator SyntaxTreeIterator::operator++(int) {
+  SyntaxTreeIterator old_this = *this;
+  if (current != NULL) {
+    if (current->next_sibling != NULL) {
+      current = current->next_sibling;
+    }
+    else if (current != root) {
+      current = current->parent;
+    }
+    else {
+      current = nullptr;
+    }
+  }
+  return old_this;
+}
