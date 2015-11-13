@@ -12,11 +12,6 @@ using namespace cnn::expr;
 
 namespace cnn {
 
-enum { X2I, BI, X2F, BF, X2O, BO, X2C, BC };
-enum { H2I, H2F, H2O, H2C, C2I, C2F, C2O };
-// See "Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks"
-// by Tai, Socher, and Manning (2015), section 3.2, for details on this model.
-// http://arxiv.org/pdf/1503.00075v3.pdf
 TreeLSTMBuilder2::TreeLSTMBuilder2(unsigned layers,
                          unsigned input_dim,
                          unsigned hidden_dim,
@@ -47,6 +42,54 @@ Expression TreeLSTMBuilder2::add_input(int id, vector<int> children, const Expre
     prev = node_builder.state();
   }
   h.push_back(embedding);
+  return embedding;
+}
+
+BidirectionalTreeLSTMBuilder2::BidirectionalTreeLSTMBuilder2(unsigned layers,
+                         unsigned input_dim,
+                         unsigned hidden_dim,
+                         Model* model) : cg(nullptr) {
+  assert (hidden_dim % 2 == 0);
+  fwd_node_builder = LSTMBuilder(layers, input_dim, hidden_dim / 2, model);
+  rev_node_builder = LSTMBuilder(layers, input_dim, hidden_dim / 2, model);
+}
+
+void BidirectionalTreeLSTMBuilder2::new_graph_impl(ComputationGraph& cg) {
+  fwd_node_builder.new_graph(cg);
+  rev_node_builder.new_graph(cg);
+}
+
+// layout: 0..layers = c
+//         layers+1..2*layers = h
+void BidirectionalTreeLSTMBuilder2::start_new_sequence_impl(const vector<Expression>& hinit) {
+  h.clear();
+  fwd_node_builder.start_new_sequence(hinit);
+  rev_node_builder.start_new_sequence(hinit);
+}
+
+Expression BidirectionalTreeLSTMBuilder2::add_input(int id, vector<int> children, const Expression& x) {
+  assert (id >= 0 && h.size() == (unsigned)id);
+
+  RNNPointer prev = (RNNPointer)(-1);
+  Expression fwd_embedding = fwd_node_builder.add_input(prev, x);
+  prev = fwd_node_builder.state();
+  for (unsigned child : children) {
+    fwd_embedding = fwd_node_builder.add_input(prev, h[child]);
+    prev = fwd_node_builder.state();
+  }
+
+  prev = (RNNPointer)(-1);
+  Expression rev_embedding = rev_node_builder.add_input(prev, x);
+  prev = rev_node_builder.state();
+  for (unsigned i = children.size(); i-- > 0;) {
+    unsigned  child = children[i];
+    rev_embedding = rev_node_builder.add_input(prev, h[child]);
+    prev = rev_node_builder.state();
+  }
+
+  Expression embedding = concatenate({fwd_embedding, rev_embedding});
+  h.push_back(embedding);
+
   return embedding;
 }
 

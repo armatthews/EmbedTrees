@@ -125,8 +125,8 @@ void SocherTreeLSTMBuilder::start_new_sequence_impl(const vector<Expression>& hi
 }
 
 Expression SocherTreeLSTMBuilder::add_input(int id, vector<int> children, const Expression& x) {
-  assert (h.size() == id);
-  assert (c.size() == id);
+  assert (id >= 0 && h.size() == (unsigned)id);
+  assert (id >= 0 && c.size() == (unsigned)id);
   h.push_back(vector<Expression>(layers));
   c.push_back(vector<Expression>(layers));
   vector<Expression>& ht = h.back();
