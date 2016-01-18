@@ -1,3 +1,4 @@
+#include "cnn/expr.h"
 #include "embedtrees.h"
 
 TreeEmbedder::TreeEmbedder() {
@@ -15,6 +16,7 @@ void TreeEmbedder::InitializeParameters(Model& model, unsigned vocab_size) {
   //tree_builder = new SocherTreeLSTMBuilder(5, lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
   //tree_builder = new TreeLSTMBuilder2(lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
   tree_builder = new BidirectionalTreeLSTMBuilder2(lstm_layer_count, node_embedding_dim, node_embedding_dim, &model);
+  //tree_builder = new DerpTreeLSTMBuilder(&model);
   output_builder = SimpleRNNBuilder(lstm_layer_count, word_embedding_dim, final_hidden_dim, &model);
 
   left_w = model.add_parameters({vocab_size, node_embedding_dim});
@@ -22,25 +24,23 @@ void TreeEmbedder::InitializeParameters(Model& model, unsigned vocab_size) {
   right_w = model.add_parameters({vocab_size, node_embedding_dim});
   right_b = model.add_parameters({vocab_size});
 
-  trans_w = model.add_parameters({word_embedding_dim, node_embedding_dim});
-  trans_b = model.add_parameters({word_embedding_dim});
+  trans_w = model.add_parameters({output_builder.num_h0_components() * final_hidden_dim, node_embedding_dim});
+  trans_b = model.add_parameters({output_builder.num_h0_components() * final_hidden_dim});
   final_w = model.add_parameters({vocab_size, final_hidden_dim});
   final_b = model.add_parameters({vocab_size});
 
   word_trans_w = model.add_parameters({node_embedding_dim, word_embedding_dim});
   word_trans_b = model.add_parameters({node_embedding_dim});
   p_E = model.add_lookup_parameters(vocab_size, {word_embedding_dim});
-  zero_annotation.resize(node_embedding_dim);
 }
 
 tuple<unsigned, Expression> TreeEmbedder::BuildGraph(const SyntaxTree& tree, ComputationGraph& cg) {
-  const bool predict_context = true; // False = predict terminals within node, true = predict prev/next word
-  const bool all_nodes = true; // False = roots only
+  const bool predict_context = false; // False = predict terminals within node, true = predict prev/next word
+  const bool all_nodes = false; // False = roots only
   const WordId kBOS = 1;
   const WordId kEOS = 2;
   NewGraph(cg);
   output_builder.new_graph(cg);
-  output_builder.start_new_sequence();
 
   vector<Expression> linear_annotations = BuildLinearAnnotationVectors(tree, cg);
   vector<Expression> tree_annotations = BuildTreeAnnotationVectors(tree, linear_annotations, cg);
@@ -92,21 +92,31 @@ tuple<unsigned, Expression> TreeEmbedder::BuildGraph(const SyntaxTree& tree, Com
 
 tuple<unsigned, Expression> TreeEmbedder::CalculateLoss(const SyntaxTree& tree, Expression embedding, ComputationGraph& cg) {
   vector<WordId> terminals = tree.GetTerminals();
-
+  const unsigned kBOS = 1;
   const unsigned kEOS = 2;
+  terminals.insert(terminals.begin(), kBOS);
   terminals.push_back(kEOS);
-  vector<Expression> word_losses(terminals.size());
-  Expression next_input = affine_transform({transb, transw, embedding});
-  
-  RNNPointer prev_state = (RNNPointer)(-1);
-  for (unsigned i = 0; i < terminals.size(); ++i) {
-    Expression final_hidden_layer = output_builder.add_input(prev_state, next_input);
+  vector<Expression> word_losses(terminals.size() - 1);
+  Expression initial_state = affine_transform({transb, transw, embedding});
+  vector<Expression> initial_state_vec(output_builder.num_h0_components());
+  vector<float> v;
+  // There should be 2 * layers vectors, each of length final_hidden_dim
+  assert (final_hidden_dim > 0);
+  for (unsigned i = 0; i < output_builder.num_h0_components(); ++i) {
+    unsigned start = i * final_hidden_dim;
+    unsigned end = (i + 1) * final_hidden_dim;
+    initial_state_vec[i] = pickrange(initial_state, start, end);
+  }
+  output_builder.start_new_sequence(initial_state_vec);
+
+  for (unsigned i = 1; i < terminals.size(); ++i) {
+    Expression prev_word_vector = lookup(cg, p_E, terminals[i - 1]);
+    Expression final_hidden_layer = output_builder.add_input(prev_word_vector);
     Expression dist = affine_transform({finalb, finalw, final_hidden_layer});
-    word_losses[i] = pickneglogsoftmax(dist, terminals[i]);
-    prev_state = output_builder.state();
-    next_input = lookup(cg, p_E, terminals[i]);
-  } 
-  return make_tuple(word_losses.size(), sum(word_losses));
+    word_losses[i - 1] = pickneglogsoftmax(dist, terminals[i]);
+  }
+  Expression total_loss = sum(word_losses); 
+  return make_tuple(word_losses.size(), total_loss);
 }
 
 tuple<unsigned, Expression> TreeEmbedder::CalculateContextLoss(const WordId prev, const WordId next, Expression embedding, ComputationGraph& cg) {
@@ -170,7 +180,7 @@ vector<Expression> TreeEmbedder::BuildLinearAnnotationVectors(const SyntaxTree& 
     Expression transb = parameter(cg, word_trans_b);
     for (WordId w : tree.GetTerminals()) {
       Expression word_vector = lookup(cg, p_E, w);
-      Expression node_embedding = affine_transform({transb, transw, word_vector});
+      Expression node_embedding = tanh(affine_transform({transb, transw, word_vector}));
       linear_annotations.push_back(node_embedding);
     }
     return linear_annotations;
@@ -207,7 +217,7 @@ vector<Expression> TreeEmbedder::BuildTreeAnnotationVectors(const SyntaxTree& so
         terminal_index++;
       }
       else {
-        input_expr = input(cg, {(long)zero_annotation.size()}, &zero_annotation);
+        input_expr = expr::zeroes(cg, {node_embedding_dim});
       }
 
       Expression node_annotation = tree_builder->add_input((int)node->id(), children, input_expr);

@@ -37,7 +37,6 @@ private:
   TreeLSTMBuilder* tree_builder;
   SimpleRNNBuilder output_builder;
   LookupParameters* p_E;
-  vector<cnn::real> zero_annotation;
 
   Parameters* left_w;
   Parameters* left_b;

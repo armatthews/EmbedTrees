@@ -19,6 +19,8 @@ public:
   virtual unsigned num_h0_components() const override;
   virtual void copy(const RNNBuilder & params) override;
   virtual Expression add_input(int id, std::vector<int> children, const Expression& x) = 0;
+  std::vector<Expression> get_h(RNNPointer i) const override { assert (false); }
+  std::vector<Expression> get_s(RNNPointer i) const override { assert (false); }
  protected:
   virtual void new_graph_impl(ComputationGraph& cg) override = 0;
   virtual void start_new_sequence_impl(const std::vector<Expression>& h0) override = 0;

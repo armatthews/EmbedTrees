@@ -54,6 +54,19 @@ private:
   ComputationGraph* cg;
 };
 
+struct DerpTreeLSTMBuilder : public TreeLSTMBuilder {
+  DerpTreeLSTMBuilder() = default;
+  explicit DerpTreeLSTMBuilder(Model* model);
+  Expression add_input(int id, std::vector<int> children, const Expression& x);
+protected:
+  void new_graph_impl(ComputationGraph& cg) override;
+  void start_new_sequence_impl(const std::vector<Expression>& h0) override;
+public:
+  std::vector<Expression> h;
+private:
+  ComputationGraph* cg;
+};
+
 } // namespace cnn
 
 #endif

@@ -107,10 +107,6 @@ int main(int argc, char** argv) {
   tree_embedder->InitializeParameters(*cnn_model, vocab.size());
   Trainer* sgd = CreateTrainer(*cnn_model, vm);
 
-  for (unsigned i = 0; i < vocab.size(); ++i) {
-    cerr << "vocab(" << i << ") = " << vocab.Convert(i) << endl;
-  }
-
   cerr << "Training model...\n";
   unsigned minibatch_count = 0;
   const unsigned report_frequency = 50;
